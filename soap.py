@@ -19,7 +19,7 @@ def soap():
        <soapenv:Header/>
        <soapenv:Body>
           <my:say_helloResponse>
-             <return>Hola, mundo!</return>
+             <return>Hola, Worl!</return>
           </my:say_helloResponse>
        </soapenv:Body>
     </soapenv:Envelope>'''

@@ -8,39 +8,14 @@ from app.services.token_service import generate_token, store_token, verify_token
 
 person_bp = Blueprint('person', __name__)
 
-def parse_soap_request(xml):
-    """Parses the incoming SOAP XML request and extracts the body."""
-    tree = etree.fromstring(xml)
-    body = tree.find('.//{http://schemas.xmlsoap.org/soap/envelope/}Body')
-    return body
-
-@person_bp.route('/persons', methods=['POST'])
-def soap():
-    xml = request.data
-    body = parse_soap_request(xml)
-    operation = body.find('.//{http://person_service}create_person')
-    
-    if operation is not None:
-        response_xml = handle_create_person(operation)
-        return Response(response_xml, content_type='text/xml')
-
-    operation = body.find('.//{http://person_service}get_person')
-    if operation is not None:
-        response_xml = handle_get_person(operation)
-        return Response(response_xml, content_type='text/xml')
-
-    return Response('Operation not supported', status=400, content_type='text/xml')
-
-@person_bp.route('/rest', methods=['GET'])
+@person_bp.route('/rest', methods=['POST'])
 def rest():
     session = db.session
     try:
-        data = {
-            "ci": 9044956,
-            "nombre": "Matias Franco",
-            "apellido": "Ramos Limachi",
-            "sexo": "Masculino"
-        }
+        data = request.get_json()
+        if not data or not all(k in data for k in ('ci', 'nombre', 'apellido', 'sexo')):
+            return jsonify({"message": "Todos los campos son requeridos"}), 400
+
 
         # Generar el token
         token, expiration = generate_token(data)
@@ -99,6 +74,12 @@ def rest():
         print(f"Se borró el token porque ya ha sido usado: {delete_token(token)}")
         print("Finalizó todo")
 
+
+def parse_soap_request(xml):
+    """Parses the incoming SOAP XML request and extracts the body."""
+    tree = etree.fromstring(xml)
+    body = tree.find('.//{http://schemas.xmlsoap.org/soap/envelope/}Body')
+    return body
         
 
 
@@ -178,3 +159,46 @@ def soap_service():
 
     # Devolver la respuesta SOAP
     return Response(soap_response, content_type='text/xml; charset=utf-8')
+
+@person_bp.route('/get-datos', methods=['GET'])
+def get_datos():
+    users = Usuario.query.all()
+    users_list = [{'ci': user.ci, 'nombre': user.nombre, 'apellido': user.apellido, 'sexo': user.sexo} for user in users]
+    return jsonify(users_list),200
+
+
+
+
+
+@person_bp.route('/get-datos-soap', methods=['POST'])
+def get_datos_soap():
+    # Obtener todos los usuarios de la base de datos
+    users = Usuario.query.all()
+    
+    # Construir el contenido de la respuesta SOAP
+    soap_envelope = etree.Element("{http://schemas.xmlsoap.org/soap/envelope/}Envelope", xmlns="http://schemas.xmlsoap.org/soap/envelope/")
+    soap_body = etree.SubElement(soap_envelope, "{http://schemas.xmlsoap.org/soap/envelope/}Body")
+    
+    # Crear el nodo principal de la respuesta
+    get_datos_response = etree.SubElement(soap_body, "GetDatosResponse", xmlns="http://example.com/")
+    
+    # Crear el nodo para la lista de usuarios
+    users_element = etree.SubElement(get_datos_response, "Users")
+    
+    # Añadir cada usuario como un elemento XML
+    for user in users:
+        user_element = etree.SubElement(users_element, "User")
+        ci_element = etree.SubElement(user_element, "CI")
+        ci_element.text = str(user.ci)
+        nombre_element = etree.SubElement(user_element, "Nombre")
+        nombre_element.text = user.nombre
+        apellido_element = etree.SubElement(user_element, "Apellido")
+        apellido_element.text = user.apellido
+        sexo_element = etree.SubElement(user_element, "Sexo")
+        sexo_element.text = user.sexo
+    
+    # Convertir el árbol XML a una cadena
+    soap_response = etree.tostring(soap_envelope, pretty_print=True, xml_declaration=True, encoding="UTF-8")
+    
+    # Devolver la respuesta SOAP
+    return Response(soap_response, content_type='text/xml')

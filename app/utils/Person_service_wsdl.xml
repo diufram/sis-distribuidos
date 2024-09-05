@@ -1,0 +1,44 @@
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+             xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+             xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+             xmlns:tns="http://example.com/"
+             targetNamespace="http://example.com/">
+
+  <message name="AddUserRequest">
+    <part name="ci" type="xsd:int"/>
+    <part name="nombre" type="xsd:string"/>
+    <part name="apellido" type="xsd:string"/>
+    <part name="sexo" type="xsd:string"/>
+  </message>
+  
+  <message name="AddUserResponse">
+    <part name="message" type="xsd:string"/>
+  </message>
+
+  <portType name="UserServicePortType">
+    <operation name="AddUser">
+      <input message="tns:AddUserRequest"/>
+      <output message="tns:AddUserResponse"/>
+    </operation>
+  </portType>
+
+  <binding name="UserServiceBinding" type="tns:UserServicePortType">
+    <soap:binding style="rpc" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="AddUser">
+      <soap:operation soapAction="http://example.com/AddUser"/>
+      <input>
+        <soap:body use="encoded" namespace="http://example.com/" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/>
+      </input>
+      <output>
+        <soap:body use="encoded" namespace="http://example.com/" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/>
+      </output>
+    </operation>
+  </binding>
+
+  <service name="UserService">
+    <port name="UserServicePort" binding="tns:UserServiceBinding">
+      <soap:address location="http://localhost:5000/soap"/>
+    </port>
+  </service>
+
+</definitions>

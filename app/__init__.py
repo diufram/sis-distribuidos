@@ -2,6 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_cors import CORS
+from app.routes import register_routes
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -17,7 +18,6 @@ def create_app(config_class='app.config.Config'):
     # Configurar CORS para permitir todas las solicitudes
     CORS(app, resources={r"/*": {"origins": "*"}})
 
-    from app.routes.user_routes import user_bp
-    app.register_blueprint(user_bp, url_prefix='/users')
+    register_routes(app=app)
 
     return app

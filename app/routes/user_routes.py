@@ -1,58 +1,89 @@
+from sqlite3 import IntegrityError
 from flask import Blueprint, request, jsonify
-from app.models.user_model import Usuario
 from app import db
-from app.services.token_service import generate_token, store_token, verify_token
+from app.models import Usuario
+from app.services.token_service import delete_token, generate_token, mark_token_as_used, store_token, verify_token, verify_token_exists
 from app.models.redis_client import get_redis_client
 user_bp = Blueprint('user', __name__)
 
-@user_bp.route('/submit', methods=['POST'])
-def submit_form():
-    data = request.json
-    token = data.get('token')
-    print(f"Token recibido: {token}")
-    print(f"Verificación del token: {verify_token(token)}")
 
-    # Verifica el token
-    if not verify_token(token):
-        return jsonify({"error": "Token inválido o ya utilizado"}), 400
-
-    # Inserta los datos en la base de datos
+@user_bp.route('/s', methods=['GET'])
+def ejemplo():
+    session = db.session
     try:
-        print("Procesando Informacion")
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": "Error al guardar el usuario en la base de datos", "details": str(e)}), 500
+        data = {
+            "ci": 9044956,
+            "nombre": "Matias Franco",
+            "apellido": "Ramos Limachi",
+            "sexo": "Masculino"
+        }
 
-    # Marca el token como usado después de la inserción en la base de datos
-    try:
-        r = get_redis_client()
-        r.set(token, 'used')  # Cambiamos el estado del token a 'used'
-    except Exception as e:
-        return jsonify({"error": "Error al actualizar el estado del token", "details": str(e)}), 500
-
-    return jsonify({"message": "Usuario creado exitosamente"}), 200
-
-@user_bp.route('/get-token', methods=['POST'])
-def get_token():
-    data = request.json
-
-    # Verifica que 'data' sea un diccionario
-    if not isinstance(data, dict):
-        return jsonify({"error": "Datos inválidos, JSON no recibido"}), 400
-
-    # Verifica que todos los campos necesarios estén presentes
-    required_fields = ['nombre', 'ci', 'telefono', 'lugar_de_nacimiento']
-    missing_fields = [field for field in required_fields if field not in data]
-    if missing_fields:
-        return jsonify({"error": f"Campos faltantes: {', '.join(missing_fields)}"}), 400
-
-    try:
+        # Generar el token
         token, expiration = generate_token(data)
+        print(f"Token: {token}")
+        print(f"Expiración del Token: {expiration}")
+
+        # Verificar si el token ya existe
+        token_status = verify_token_exists(token)
+        if token_status:
+            if token_status == 2:
+                return jsonify({"message": "Se está procesando su solicitud"}), 200
+            elif token_status == 0:
+                print(f"Se borró el token porque se expiró: {delete_token(token)}")
+                return jsonify({"message": "Su token expiró, intente nuevamente"}), 200
+            elif token_status == 1:
+                print(f"Se borró el token porque ya ha sido usado: {delete_token(token)}")
+                return jsonify({"message": "Su token ya ha sido usado, intente más tarde"}), 200
+
+        print("Se guardó el Token")
         store_token(token, expiration)
-        print(f"Token generado: {token}")
-        return jsonify({"token": token}), 200
+
+        # Crear un nuevo usuario
+        nuevo_usuario = Usuario(
+            ci=data['ci'],
+            nombre=data['nombre'],
+            apellido=data['apellido'],
+            sexo=data['sexo']
+        )
+
+        # Agregar el nuevo usuario a la sesión
+        session.add(nuevo_usuario)
+        
+        # Confirmar la transacción
+        session.commit()
+
+        mark_token_as_used(token)
+        
+
+        return jsonify({"message": "Usuario agregado exitosamente."}), 201
+
+    except IntegrityError as e:
+        session.rollback()
+        print(f"Error de integridad: {e}")  # Registro del error en el log
+        return jsonify({"message": "El usuario ya existe"}), 400
+
+    except ValueError as e:
+        session.rollback()
+        return jsonify({"message": str(e)}), 400
+
     except Exception as e:
-        # Captura y muestra el error
-        print(f"Error en get_token: {e}")
-        return jsonify({"error": str(e)}), 500
+        session.rollback()
+        return jsonify({"message": "Error interno del servidor"}), 500
+
+    finally:
+        session.remove()  # Asegúrate de cerrar la sesión
+        print(f"Se borró el token porque ya ha sido usado: {delete_token(token)}")
+        print("Finalizó todo")
+
+        
+@user_bp.route('/pg')
+def postgres_version():
+    try:
+        # Ejecuta una consulta para obtener la versión de PostgreSQL
+        result = db.session.execute('SELECT * FROM YO;')
+        version = result.fetchone()[0]
+        return f'Versión de PostgreSQL: {version}'
+    except Exception as e:
+        return f'Error al obtener la versión de PostgreSQL: {e}'
+
 

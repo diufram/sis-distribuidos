@@ -1,9 +1,8 @@
 from flask import Blueprint, request, Response,jsonify
 from lxml import etree
 from app import db
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError,SQLAlchemyError
 from app.models import Usuario 
-from app.services.person_service import handle_create_person, handle_get_person
 from app.services.token_service import generate_token, store_token, verify_token, delete_token,mark_token_as_used,verify_token_exists
 
 person_bp = Blueprint('person', __name__)
@@ -64,6 +63,7 @@ def rest():
     except ValueError as e:
         session.rollback()
         return jsonify({"message": str(e)}), 400
+    
 
     except Exception as e:
         session.rollback()
@@ -111,20 +111,20 @@ def soap_service():
         # Verificar si el token ya existe
         token_status = verify_token_exists(token)
         if token_status:
-            if token_status == 2:
+            if verify_token(token) == 2:
                 response_message = "Se está procesando su solicitud"
-            elif token_status == 0:
+            elif verify_token(token) == 0:
                 print(f"Se borró el token porque se expiró: {delete_token(token)}")
                 response_message = "Su token expiró, intente nuevamente"
-            elif token_status == 1:
+            elif verify_token(token) == 1:
                 print(f"Se borró el token porque ya ha sido usado: {delete_token(token)}")
                 response_message = "Su token ya ha sido usado, intente más tarde"
-        else:
-            print("Se guardó el Token")
-            store_token(token, expiration)
+        
+        #print("Se guardó el Token")
+        store_token(token, expiration)
 
             # Crear un nuevo usuario
-            nuevo_usuario = Usuario(
+        nuevo_usuario = Usuario(
                 ci=data['ci'],
                 nombre=data['nombre'],
                 apellido=data['apellido'],
@@ -132,19 +132,22 @@ def soap_service():
             )
 
             # Agregar el nuevo usuario a la sesión
-            db.session.add(nuevo_usuario)
-            db.session.commit()
+        db.session.add(nuevo_usuario)
+        db.session.commit()
 
-            mark_token_as_used(token)
+        mark_token_as_used(token)
 
-            response_message = "Usuario agregado exitosamente."
+        response_message = "Usuario agregado exitosamente."
 
     except IntegrityError as e:
         db.session.rollback()
         response_message = "El usuario ya existe"
     except ValueError as e:
         response_message = str(e)
+    except SQLAlchemyError as e:
+        response_message = "ERROR DE CONEXION A LA BASE DE DATOS"
     except Exception as e:
+        print(f"{e}")
         response_message = "Error interno del servidor"
 
     # Construir la respuesta SOAP
@@ -159,6 +162,7 @@ def soap_service():
 
     # Devolver la respuesta SOAP
     return Response(soap_response, content_type='text/xml; charset=utf-8')
+    
 
 @person_bp.route('/get-datos', methods=['GET'])
 def get_datos():

@@ -15,6 +15,6 @@ class Config:
     # Configuración de SQLAlchemy
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         'SQLALCHEMY_DATABASE_URI', 
-        'postgresql://postgres:0000@localhost:5432/prueba'
+        'postgresql://matias:0000@localhost:5432/distribuido'
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False

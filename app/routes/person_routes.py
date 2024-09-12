@@ -1,167 +1,18 @@
-from flask import Blueprint, request, Response,jsonify
-from lxml import etree
-from app import db
-from sqlalchemy.exc import IntegrityError,SQLAlchemyError
+from flask import Blueprint, request,jsonify
+
+
 from app.models import Usuario 
-from app.services.token_service import generate_token, store_token, verify_token, delete_token,mark_token_as_used,verify_token_exists
+from app.services.person_service import rest
 
 person_bp = Blueprint('person', __name__)
 
 @person_bp.route('/rest', methods=['POST'])
-def rest():
-    session = db.session
-    try:
-        data = request.get_json()
-        if not data or not all(k in data for k in ('ci', 'nombre', 'apellido', 'sexo')):
-            return jsonify({"message": "Todos los campos son requeridos"}), 400
+def createrest():
+    data = request.get_json()
+    respuesta = rest(data)
+    return respuesta
 
 
-        # Generar el token
-        token, expiration = generate_token(data)
-        print(f"Token: {token}")
-        print(f"Expiración del Token: {expiration}")
-
-        # Verificar si el token ya existe
-        token_status = verify_token_exists(token)
-        if token_status:
-            if verify_token == 2:
-                return jsonify({"message": "Se está procesando su solicitud"}), 200
-            elif verify_token == 0:
-                print(f"Se borró el token porque se expiró: {delete_token(token)}")
-                return jsonify({"message": "Su token expiró, intente nuevamente"}), 200
-            elif verify_token == 1:
-                print(f"Se borró el token porque ya ha sido usado: {delete_token(token)}")
-                return jsonify({"message": "Su token ya ha sido usado, intente más tarde"}), 200
-
-        print("Se guardó el Token")
-        store_token(token, expiration)
-
-        # Crear un nuevo usuario
-        nuevo_usuario = Usuario(
-            ci=data['ci'],
-            nombre=data['nombre'],
-            apellido=data['apellido'],
-            sexo=data['sexo']
-        )
-
-        # Agregar el nuevo usuario a la sesión
-        session.add(nuevo_usuario)
-        
-        # Confirmar la transacción
-        session.commit()
-
-        mark_token_as_used(token)
-        
-
-        return jsonify({"message": "Usuario agregado exitosamente."}), 201
-
-    except IntegrityError as e:
-        session.rollback()
-        print(f"Error de integridad: {e}")  # Registro del error en el log
-        return jsonify({"message": "El usuario ya existe"}), 400
-
-    except ValueError as e:
-        session.rollback()
-        return jsonify({"message": str(e)}), 400
-    
-
-    except Exception as e:
-        session.rollback()
-        return jsonify({"message": "Error interno del servidor"}), 500
-
-    finally:
-        session.remove()  # Asegúrate de cerrar la sesión
-        print(f"Se borró el token porque ya ha sido usado: {delete_token(token)}")
-        print("Finalizó todo")
-
-
-def parse_soap_request(xml):
-    """Parses the incoming SOAP XML request and extracts the body."""
-    tree = etree.fromstring(xml)
-    body = tree.find('.//{http://schemas.xmlsoap.org/soap/envelope/}Body')
-    return body
-        
-
-
-@person_bp.route('/soap', methods=['POST'])
-def soap_service():
-    # Parsear el mensaje SOAP recibido
-    soap_request = etree.fromstring(request.data)
-    
-    # Extraer los parámetros del mensaje SOAP
-    ci = soap_request.find('.//{http://example.com/}ci').text
-    nombre = soap_request.find('.//{http://example.com/}nombre').text
-    apellido = soap_request.find('.//{http://example.com/}apellido').text
-    sexo = soap_request.find('.//{http://example.com/}sexo').text
-
-    response_message = ""
-    try:
-        data = {
-            "ci": int(ci),
-            "nombre": nombre,
-            "apellido": apellido,
-            "sexo": sexo
-        }
-
-        # Generar el token
-        token, expiration = generate_token(data)
-        print(f"Token: {token}")
-        print(f"Expiración del Token: {expiration}")
-
-        # Verificar si el token ya existe
-        token_status = verify_token_exists(token)
-        if token_status:
-            if verify_token(token) == 2:
-                response_message = "Se está procesando su solicitud"
-            elif verify_token(token) == 0:
-                print(f"Se borró el token porque se expiró: {delete_token(token)}")
-                response_message = "Su token expiró, intente nuevamente"
-            elif verify_token(token) == 1:
-                print(f"Se borró el token porque ya ha sido usado: {delete_token(token)}")
-                response_message = "Su token ya ha sido usado, intente más tarde"
-        
-        #print("Se guardó el Token")
-        store_token(token, expiration)
-
-            # Crear un nuevo usuario
-        nuevo_usuario = Usuario(
-                ci=data['ci'],
-                nombre=data['nombre'],
-                apellido=data['apellido'],
-                sexo=data['sexo']
-            )
-
-            # Agregar el nuevo usuario a la sesión
-        db.session.add(nuevo_usuario)
-        db.session.commit()
-
-        mark_token_as_used(token)
-
-        response_message = "Usuario agregado exitosamente."
-
-    except IntegrityError as e:
-        db.session.rollback()
-        response_message = "El usuario ya existe"
-    except ValueError as e:
-        response_message = str(e)
-    except SQLAlchemyError as e:
-        response_message = "ERROR DE CONEXION A LA BASE DE DATOS"
-    except Exception as e:
-        print(f"{e}")
-        response_message = "Error interno del servidor"
-
-    # Construir la respuesta SOAP
-    soap_envelope = etree.Element("{http://schemas.xmlsoap.org/soap/envelope/}Envelope", xmlns="http://schemas.xmlsoap.org/soap/envelope/")
-    soap_body = etree.SubElement(soap_envelope, "{http://schemas.xmlsoap.org/soap/envelope/}Body")
-    add_user_response = etree.SubElement(soap_body, "AddUserResponse", xmlns="http://example.com/")
-    message_element = etree.SubElement(add_user_response, "message")
-    message_element.text = response_message
-
-    # Convertir el árbol XML a una cadena
-    soap_response = etree.tostring(soap_envelope, pretty_print=True, xml_declaration=True, encoding="UTF-8")
-
-    # Devolver la respuesta SOAP
-    return Response(soap_response, content_type='text/xml; charset=utf-8')
     
 
 @person_bp.route('/get-datos', methods=['GET'])
@@ -174,35 +25,3 @@ def get_datos():
 
 
 
-@person_bp.route('/get-datos-soap', methods=['POST'])
-def get_datos_soap():
-    # Obtener todos los usuarios de la base de datos
-    users = Usuario.query.all()
-    
-    # Construir el contenido de la respuesta SOAP
-    soap_envelope = etree.Element("{http://schemas.xmlsoap.org/soap/envelope/}Envelope", xmlns="http://schemas.xmlsoap.org/soap/envelope/")
-    soap_body = etree.SubElement(soap_envelope, "{http://schemas.xmlsoap.org/soap/envelope/}Body")
-    
-    # Crear el nodo principal de la respuesta
-    get_datos_response = etree.SubElement(soap_body, "GetDatosResponse", xmlns="http://example.com/")
-    
-    # Crear el nodo para la lista de usuarios
-    users_element = etree.SubElement(get_datos_response, "Users")
-    
-    # Añadir cada usuario como un elemento XML
-    for user in users:
-        user_element = etree.SubElement(users_element, "User")
-        ci_element = etree.SubElement(user_element, "CI")
-        ci_element.text = str(user.ci)
-        nombre_element = etree.SubElement(user_element, "Nombre")
-        nombre_element.text = user.nombre
-        apellido_element = etree.SubElement(user_element, "Apellido")
-        apellido_element.text = user.apellido
-        sexo_element = etree.SubElement(user_element, "Sexo")
-        sexo_element.text = user.sexo
-    
-    # Convertir el árbol XML a una cadena
-    soap_response = etree.tostring(soap_envelope, pretty_print=True, xml_declaration=True, encoding="UTF-8")
-    
-    # Devolver la respuesta SOAP
-    return Response(soap_response, content_type='text/xml')

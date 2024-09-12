@@ -6,7 +6,8 @@ class Transaccion(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     fecha = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    monto = db.Column(db.Numeric(precision=10, scale=2), nullable=False)
+    monto = db.Column(db.Float(), nullable=False)
+    tipo = db.Column(db.Integer,nullable = False)
     id_cuenta = db.Column(db.Integer, db.ForeignKey('cuentas.id'), nullable=False)
     ci_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.ci'), nullable=False)
     

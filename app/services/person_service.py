@@ -1,56 +1,64 @@
 from lxml import etree
-from app.models import Usuario
+from flask import jsonify
+from sqlalchemy.exc import IntegrityError,SQLAlchemyError
 from app import db
+from app.models import Usuario 
+import time
+from app.services.token_service import generate_token, store_token, verify_token, delete_token,mark_token_as_used,verify_token_exists
 
-# Datos simulados en memoria para el ejemplo
-people_db = {}
 
-def handle_create_person(operation):
-    ci = operation.find('{http://person_service}ci').text
-    nombre = operation.find('{http://person_service}nombre').text
-    apellido = operation.find('{http://person_service}apellido').text
-    sexo = operation.find('{http://person_service}sexo').text
-    token = operation.find('{http://person_service}token').text
+def rest(data):
+    session = db.session
+    try:
+         if not data or not all(k in data for k in ('ci', 'nombre', 'apellido', 'sexo')):
+            return jsonify({"message": "Todos los campos son requeridos"}), 400
+         
+         token, expiration = generate_token(data)
 
-    if token != "valid_token":  # Simple token validation
-        return create_soap_response('create_person', 'Invalid token')
+         token_status = verify_token_exists(token)
+         if token_status:
+            if verify_token == 2:
+                return jsonify({"message": "Se está procesando su solicitud"}), 200
+            elif verify_token == 0:
+                return jsonify({"message": "Su token expiró, intente nuevamente"}), 200
+            elif verify_token == 1:
+                return jsonify({"message": "Su token ya ha sido usado, intente más tarde"}), 200
+
+         store_token(token, expiration)
+
+         nuevo_usuario = Usuario(
+            ci=data['ci'],
+            nombre=data['nombre'],
+            apellido=data['apellido'],
+            sexo=data['sexo']
+         )
+         session.add(nuevo_usuario)
+         #time.sleep(2)
+         session.commit()
+         mark_token_as_used(token)
+         respuesta = jsonify({"message": "Usuario agregado exitosamente."}), 201
+         return respuesta
+
+    except IntegrityError as e:
+      session.rollback()
+      respuesta = jsonify({"message": "El usuario ya existe"}), 200
+      return respuesta
     
-    people_db[ci] = {'nombre': nombre, 'apellido': apellido, 'sexo': sexo}
-    return create_soap_response('create_person', 'Success')
-
-def handle_get_person(operation):
-    ci = operation.find('{http://person_service}ci').text
-    token = operation.find('{http://person_service}token').text
-
-    if token != "valid_token":
-        return create_soap_response('get_person', 'Invalid token')
+    except ValueError as e:
+      session.rollback()
+      respuesta = jsonify({"message": str(e)}), 400
+      return respuesta
     
-    person = people_db.get(ci, None)
-    if person:
-        response_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
-        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:my="http://person_service">
-           <soapenv:Header/>
-           <soapenv:Body>
-              <my:get_personResponse>
-                 <nombre>{person['nombre']}</nombre>
-                 <apellido>{person['apellido']}</apellido>
-                 <sexo>{person['sexo']}</sexo>
-              </my:get_personResponse>
-           </soapenv:Body>
-        </soapenv:Envelope>'''
-        return response_xml
-    else:
-        return create_soap_response('get_person', 'Person not found')
+    except SQLAlchemyError as e:
+      print(e)
+      respuesta=  jsonify({"message": "Error en la conexion con la base de datos"}), 200
+      return respuesta
 
-def create_soap_response(operation, status):
-    """Generates a SOAP response based on the operation and status."""
-    response_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
-    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:my="http://person_service">
-       <soapenv:Header/>
-       <soapenv:Body>
-          <my:{operation}Response>
-             <status>{status}</status>
-          </my:{operation}Response>
-       </soapenv:Body>
-    </soapenv:Envelope>'''
-    return response_xml
+    except Exception as e:
+      session.rollback()
+      respuesta = jsonify({"message": "Error interno del servidor"}), 500
+      return respuesta
+
+    finally:
+      session.remove() 
+      delete_token(token)

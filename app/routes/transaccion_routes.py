@@ -1,5 +1,5 @@
 from flask import Blueprint,request
-from app.services.transaccion_service import transaccion,getAll
+from app.services.transaccion_service import getAll,transaccion
 transaccion_bp = Blueprint('transaccion', __name__)
 
 

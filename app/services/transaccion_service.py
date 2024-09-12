@@ -4,77 +4,58 @@ from app.models.user_model import Usuario
 from app.models.transaccion_model import Transaccion
 from flask import jsonify
 from sqlalchemy.exc import IntegrityError,SQLAlchemyError
-import logging
 from sqlalchemy import func
 
-logging.basicConfig(level=logging.DEBUG, 
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    filename='app.log',  # Guardar los logs en un archivo
-                    filemode='a') 
-
-def transaccion(data):
+def transaccion (data):
     try:
-        logging.info("Iniciando transacción")  # Log de inicio
-
-        if not data or not all(k in data for k in ('nroCuenta', 'tipo', 'monto', 'ciUsuario')):
-            logging.warning("Faltan campos requeridos en la solicitud")  # Log de advertencia
+        if not data or not all(k in data for k in ('nroCuenta', 'tipo', 'monto','ciUsuario')):
             respuesta = jsonify({"message": "Todos los campos son requeridos", "status": False}), 400
             return respuesta
-
         tipo = data['tipo']
         nroCuenta = data['nroCuenta']
         monto = data['monto']
         ciUsuario = data['ciUsuario']
+        
 
-        logging.info(f"Datos de la transacción: tipo={tipo}, nroCuenta={nroCuenta}, monto={monto}, ciUsuario={ciUsuario}")
+        if tipo == 1: #retiro
 
-        if tipo == 1:  # Retiro
-            logging.info("Iniciando retiro")
-            if not hayfonndos(nroCuenta=nroCuenta, monto=monto):
-                logging.warning("Fondos insuficientes para el retiro")  # Log de advertencia
+            if not hayfonndos(nroCuenta=nroCuenta, monto= monto):
                 respuesta = jsonify({"message": "Fondos Insuficientes", "status": False}), 400
                 return respuesta
-
-            retiro(nroCuenta=nroCuenta, monto=monto)
-            guardarTransaccion(nroCuenta=nroCuenta, ciUsuario=ciUsuario, monto=monto, tipo=tipo)
-            logging.info("Retiro exitoso")  # Log de éxito
+            retiro(nroCuenta=nroCuenta,monto=monto)
+            guardarTransaccion(nroCuenta=nroCuenta,ciUsuario=ciUsuario,monto=monto,tipo=tipo)
             respuesta = jsonify({"message": "Transaccion exitosa", "status": True}), 200
             return respuesta
+        
+        else: 
 
-        elif tipo == 0:  # Depósito
-            logging.info("Iniciando depósito")
-            deposito(nroCuenta=nroCuenta, monto=monto)
-            guardarTransaccion(nroCuenta=nroCuenta, ciUsuario=ciUsuario, monto=monto, tipo=tipo)
-            logging.info("Depósito exitoso")  # Log de éxito
-            respuesta = jsonify({"message": "Transaccion exitosa", "status": True}), 200
-            return respuesta
-
+            if tipo == 0: #deposito
+                deposito(nroCuenta=nroCuenta,monto=monto)
+                guardarTransaccion(nroCuenta=nroCuenta,ciUsuario=ciUsuario,monto=monto,tipo=tipo)
+                respuesta = jsonify({"message": "Transaccion exitosa", "status": True}), 200
+                return respuesta
+            
     except IntegrityError as e:
         db.session.rollback()
-        logging.error(f"Error de integridad: {e}")  # Log de error
         respuesta = jsonify({"message": "El numero de transaccion ya exite", "status": False}), 409
         return respuesta
-
+    
     except ValueError as e:
         db.session.rollback()
-        logging.error(f"Error de valor: {e}")  # Log de error
-        respuesta = jsonify({"message": "Error con los valores proporcionados", "status": False}), 400
-        return respuesta
-
+        
     except SQLAlchemyError as e:
-        logging.error(f"Error en la base de datos: {e}")  # Log de error de SQL
         respuesta = jsonify({"message": "Error con la base de datos", "status": False}), 500
         return respuesta
-
+    
     except Exception as e:
-        logging.critical(f"Error interno del servidor: {e}")  # Log de error crítico
+        print(f"Error: {e}")
         respuesta = jsonify({"message": "Error interno del servidor", "status": False}), 500
         return respuesta
-
+        
     finally:
         db.session.commit()
-        db.session.remove()
-        logging.info("Transacción finalizada y base de datos actualizada")  # Log final
+        db.session.remove() 
+
     
     
 

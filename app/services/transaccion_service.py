@@ -6,58 +6,85 @@ from flask import jsonify
 from sqlalchemy.exc import IntegrityError,SQLAlchemyError
 from sqlalchemy import func
 
-def transaccion (data):
+import logging
+
+# Configura el logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  # Ajusta el nivel de log a DEBUG o el que necesites
+
+# Crea un manejador para el archivo de logs y establece el formato
+log_file_path = 'transaccion.log'  # Archivo log en la raíz del proyecto
+handler = logging.FileHandler(log_file_path)
+handler.setLevel(logging.DEBUG)  # Ajusta el nivel de log a DEBUG o el que necesites
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+
+# Agrega el manejador al logger
+logger.addHandler(handler)
+def transaccion(data):
     try:
-        if not data or not all(k in data for k in ('nroCuenta', 'tipo', 'monto','ciUsuario')):
+        if not data or not all(k in data for k in ('nroCuenta', 'tipo', 'monto', 'ciUsuario')):
+            logger.warning('Datos incompletos: %s', data)
             respuesta = jsonify({"message": "Todos los campos son requeridos", "status": False}), 400
             return respuesta
+
         tipo = data['tipo']
         nroCuenta = data['nroCuenta']
         monto = data['monto']
         ciUsuario = data['ciUsuario']
-        
 
-        if tipo == 1: #retiro
-
-            if not hayfonndos(nroCuenta=nroCuenta, monto= monto):
+        if tipo == 1:  # retiro
+            if not hayfonndos(nroCuenta=nroCuenta, monto=monto):
+                logger.warning('Fondos insuficientes para cuenta %s con monto %s', nroCuenta, monto)
                 respuesta = jsonify({"message": "Fondos Insuficientes", "status": False}), 400
                 return respuesta
-            retiro(nroCuenta=nroCuenta,monto=monto)
-            guardarTransaccion(nroCuenta=nroCuenta,ciUsuario=ciUsuario,monto=monto,tipo=tipo)
+
+            retiro(nroCuenta=nroCuenta, monto=monto)
+            guardarTransaccion(nroCuenta=nroCuenta, ciUsuario=ciUsuario, monto=monto, tipo=tipo)
+            logger.info('Retiro exitoso: cuenta %s, monto %s', nroCuenta, monto)
             respuesta = jsonify({"message": "Transaccion exitosa", "status": True}), 200
             return respuesta
-        
-        else: 
 
-            if tipo == 0: #deposito
-                deposito(nroCuenta=nroCuenta,monto=monto)
-                guardarTransaccion(nroCuenta=nroCuenta,ciUsuario=ciUsuario,monto=monto,tipo=tipo)
-                respuesta = jsonify({"message": "Transaccion exitosa", "status": True}), 200
-                return respuesta
-            
+        elif tipo == 0:  # deposito
+            deposito(nroCuenta=nroCuenta, monto=monto)
+            guardarTransaccion(nroCuenta=nroCuenta, ciUsuario=ciUsuario, monto=monto, tipo=tipo)
+            logger.info('Deposito exitoso: cuenta %s, monto %s', nroCuenta, monto)
+            respuesta = jsonify({"message": "Transaccion exitosa", "status": True}), 200
+            return respuesta
+
+        else:
+            logger.warning('Tipo de transacción no válido: %s', tipo)
+            respuesta = jsonify({"message": "Tipo de transacción no válido", "status": False}), 400
+            return respuesta
+
     except IntegrityError as e:
         db.session.rollback()
-        respuesta = jsonify({"message": "El numero de transaccion ya exite", "status": False}), 409
+        logger.error('Error de integridad: %s', str(e))
+        respuesta = jsonify({"message": "El numero de transaccion ya existe", "status": False}), 409
         return respuesta
-    
+
     except ValueError as e:
         db.session.rollback()
-        
+        logger.error('Error de valor: %s', str(e))
+        respuesta = jsonify({"message": "Error en los valores proporcionados", "status": False}), 400
+        return respuesta
+
     except SQLAlchemyError as e:
+        logger.error('Error con la base de datos: %s', str(e))
         respuesta = jsonify({"message": "Error con la base de datos", "status": False}), 500
         return respuesta
-    
+
     except Exception as e:
-        print(f"Error: {e}")
+        logger.error('Error interno del servidor: %s', str(e))
         respuesta = jsonify({"message": "Error interno del servidor", "status": False}), 500
         return respuesta
-        
+
     finally:
         db.session.commit()
-        db.session.remove() 
+        db.session.remove()
+        logger.info('Transacción completada para cuenta %s, tipo %s', nroCuenta, tipo)
 
-    
-    
+
 
 def hayfonndos(nroCuenta, monto):
     saldo = db.session.query(Cuenta.saldo).filter_by(id = nroCuenta).scalar()

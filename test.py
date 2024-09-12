@@ -41,7 +41,7 @@ def thread_function(cuentas, saldo_maximo, saldo_minimo, usuarios):
         time.sleep(0.1)  # Opcional: retraso para no sobrecargar el servidor
 
 # Número de hilos
-num_threads = 1000
+num_threads = 2000
 
 # Crea y arranca los hilos
 response_data = getAll()

@@ -21,8 +21,8 @@ class Config:
 
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': int(os.environ.get('POOL_SIZE', 5)),  # Tamaño máximo del pool
-        'max_overflow': int(os.environ.get('MAX_OVERFLOW', 2)),  # Conexiones adicionales permitidas si el pool está lleno
-        'pool_timeout': int(os.environ.get('POOL_TIMEOUT', 30)),  # Tiempo máximo de espera para una conexión en el pool
-        'pool_recycle': int(os.environ.get('POOL_RECYCLE', 1800)),  # Tiempo en segundos para reciclar conexiones
+        'max_overflow': int(os.environ.get('MAX_OVERFLOW', 1)),  # Conexiones adicionales permitidas si el pool está lleno
+        'pool_timeout': int(os.environ.get('POOL_TIMEOUT', 10)),  # Tiempo máximo de espera para una conexión en el pool
+        'pool_recycle': int(os.environ.get('POOL_RECYCLE', 5)),  # Tiempo en segundos para reciclar conexiones
         'pool_pre_ping': bool(os.environ.get('POOL_PRE_PING', True))  # Habilitar verificación previa de la conexión
     }

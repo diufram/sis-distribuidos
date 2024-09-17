@@ -3,7 +3,7 @@ from app.models.cuenta_model import Cuenta
 from app.models.user_model import Usuario
 from app.models.transaccion_model import Transaccion
 from flask import jsonify
-from sqlalchemy.exc import IntegrityError,SQLAlchemyError,OperationalError,SerializationFailure
+from sqlalchemy.exc import IntegrityError,SQLAlchemyError,OperationalError
 
 from sqlalchemy import func
 
@@ -89,13 +89,8 @@ def transaccion(data):
         respuesta = jsonify({"message": "Error interno del servidor", "status": False}), 500
         return respuesta
     
-    except SerializationFailure as e:
-        db.session.rollback()
-        respuesta = jsonify({"message": "Error de concurrencia: no se pudo serializar la transacción", "status": False}), 409
-        return respuesta
-
     finally:
-        db.session.remove()
+        db.session.close()
         logger.info('Transacción completada para cuenta %s, tipo %s', nroCuenta, tipo)
 
 

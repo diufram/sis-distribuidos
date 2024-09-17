@@ -3,7 +3,8 @@ from app.models.cuenta_model import Cuenta
 from app.models.user_model import Usuario
 from app.models.transaccion_model import Transaccion
 from flask import jsonify
-from sqlalchemy.exc import IntegrityError,SQLAlchemyError
+from sqlalchemy.exc import IntegrityError,SQLAlchemyError,OperationalError,SerializationFailure
+
 from sqlalchemy import func
 
 import logging
@@ -43,6 +44,7 @@ def transaccion(data):
             guardarTransaccion(nroCuenta=nroCuenta, ciUsuario=ciUsuario, monto=monto, tipo=tipo)
             logger.info('Retiro exitoso: cuenta %s, monto %s', nroCuenta, monto)
             respuesta = jsonify({"message": "Transaccion exitosa", "status": True}), 200
+            db.session.commit()
             return respuesta
 
         elif tipo == 0:  # deposito
@@ -50,6 +52,7 @@ def transaccion(data):
             guardarTransaccion(nroCuenta=nroCuenta, ciUsuario=ciUsuario, monto=monto, tipo=tipo)
             logger.info('Deposito exitoso: cuenta %s, monto %s', nroCuenta, monto)
             respuesta = jsonify({"message": "Transaccion exitosa", "status": True}), 200
+            db.session.commit()
             return respuesta
 
         else:
@@ -62,6 +65,12 @@ def transaccion(data):
         logger.error('Error de integridad: %s', str(e))
         respuesta = jsonify({"message": "El numero de transaccion ya existe", "status": False}), 409
         return respuesta
+    
+    except OperationalError as e:
+        db.session.rollback()
+        respuesta = jsonify({"message": "Error de base de datos", "status": False}), 409
+        return respuesta
+        
 
     except ValueError as e:
         db.session.rollback()
@@ -70,6 +79,7 @@ def transaccion(data):
         return respuesta
 
     except SQLAlchemyError as e:
+        db.session.rollback()
         logger.error('Error con la base de datos: %s', str(e))
         respuesta = jsonify({"message": "Error con la base de datos", "status": False}), 500
         return respuesta
@@ -78,9 +88,13 @@ def transaccion(data):
         logger.error('Error interno del servidor: %s', str(e))
         respuesta = jsonify({"message": "Error interno del servidor", "status": False}), 500
         return respuesta
+    
+    except SerializationFailure as e:
+        db.session.rollback()
+        respuesta = jsonify({"message": "Error de concurrencia: no se pudo serializar la transacción", "status": False}), 409
+        return respuesta
 
     finally:
-        db.session.commit()
         db.session.remove()
         logger.info('Transacción completada para cuenta %s, tipo %s', nroCuenta, tipo)
 

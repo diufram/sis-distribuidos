@@ -15,6 +15,14 @@ class Config:
     # Configuración de SQLAlchemy
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         'SQLALCHEMY_DATABASE_URI', 
-        'postgresql://postgres:123456@10.29.8.36:5432/dbprueba?options=-c%20default_transaction_isolation=serializable'
+        'postgresql://matias:0000@localhost:5432/distribuido?options=-c%20default_transaction_isolation=serializable'
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': int(os.environ.get('POOL_SIZE', 5)),  # Tamaño máximo del pool
+        'max_overflow': int(os.environ.get('MAX_OVERFLOW', 2)),  # Conexiones adicionales permitidas si el pool está lleno
+        'pool_timeout': int(os.environ.get('POOL_TIMEOUT', 30)),  # Tiempo máximo de espera para una conexión en el pool
+        'pool_recycle': int(os.environ.get('POOL_RECYCLE', 1800)),  # Tiempo en segundos para reciclar conexiones
+        'pool_pre_ping': bool(os.environ.get('POOL_PRE_PING', True))  # Habilitar verificación previa de la conexión
+    }

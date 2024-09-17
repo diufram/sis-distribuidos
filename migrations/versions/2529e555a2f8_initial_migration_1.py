@@ -1,8 +1,8 @@
-"""Regenerar migraciones
+"""Initial migration 1 
 
-Revision ID: e8949f95253f
+Revision ID: 2529e555a2f8
 Revises: 
-Create Date: 2024-09-10 20:12:03.053505
+Create Date: 2024-09-12 18:59:56.280084
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'e8949f95253f'
+revision = '2529e555a2f8'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -27,7 +27,7 @@ def upgrade():
     )
     op.create_table('cuentas',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('nombre', sa.String(length=100), nullable=False),
+    sa.Column('saldo', sa.Float(), nullable=False),
     sa.Column('ci_usuario', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['ci_usuario'], ['usuarios.ci'], ),
     sa.PrimaryKeyConstraint('id')
@@ -35,8 +35,11 @@ def upgrade():
     op.create_table('transacciones',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('fecha', sa.DateTime(), nullable=False),
-    sa.Column('monto', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('monto', sa.Float(), nullable=False),
+    sa.Column('tipo', sa.Integer(), nullable=False),
     sa.Column('id_cuenta', sa.Integer(), nullable=False),
+    sa.Column('ci_usuario', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['ci_usuario'], ['usuarios.ci'], ),
     sa.ForeignKeyConstraint(['id_cuenta'], ['cuentas.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

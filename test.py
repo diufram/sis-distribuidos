@@ -36,12 +36,12 @@ def thread_function(cuentas, saldo_maximo, saldo_minimo, usuarios):
         cuenta_aleatoria = random.choice(cuentas)
         usuario_aleatorio = random.choice(usuarios)
         monto_aleatorio = random.uniform(saldo_minimo, saldo_maximo)
-        numero_aleatorio = random.choice([0, 1])
+        numero_aleatorio = 1#random.choice([0, 1])
         make_request(cuenta_aleatoria, numero_aleatorio, monto_aleatorio, usuario_aleatorio)
         time.sleep(0.1)  # Opcional: retraso para no sobrecargar el servidor
 
 # Número de hilos
-num_threads = 2000
+num_threads = 100
 
 # Crea y arranca los hilos
 response_data = getAll()

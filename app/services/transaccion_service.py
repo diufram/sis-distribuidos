@@ -22,8 +22,11 @@ handler.setFormatter(formatter)
 
 # Agrega el manejador al logger
 logger.addHandler(handler)
+
 def transaccion(data):
+    
     try:
+        db.session.begin()
         if not data or not all(k in data for k in ('nroCuenta', 'tipo', 'monto', 'ciUsuario')):
             logger.warning('Datos incompletos: %s', data)
             respuesta = jsonify({"message": "Todos los campos son requeridos", "status": False}), 400
@@ -68,7 +71,7 @@ def transaccion(data):
     
     except OperationalError as e:
         db.session.rollback()
-        respuesta = jsonify({"message": "Error de base de datos", "status": False}), 409
+        respuesta = jsonify({"message": "Error de base de datos", "status": False}), 410
         return respuesta
         
 
@@ -85,12 +88,13 @@ def transaccion(data):
         return respuesta
 
     except Exception as e:
+        db.session.rollback()
         logger.error('Error interno del servidor: %s', str(e))
         respuesta = jsonify({"message": "Error interno del servidor", "status": False}), 500
         return respuesta
     
     finally:
-        db.session.close()
+        db.session.remove()
         logger.info('Transacción completada para cuenta %s, tipo %s', nroCuenta, tipo)
 
 

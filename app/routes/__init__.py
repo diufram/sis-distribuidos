@@ -5,7 +5,9 @@ def register_routes(app: Flask):
     from .user_routes import user_bp
     from .person_routes import person_bp
     from .transaccion_routes import transaccion_bp
+    from .transaccion_async_routes import transaccion_async_bp
 
     app.register_blueprint(user_bp, url_prefix='/users')
     app.register_blueprint(person_bp, url_prefix='/persons')
     app.register_blueprint(transaccion_bp, url_prefix='/transaccion')
+    app.register_blueprint(transaccion_async_bp, url_prefix='/transaccion-async')

@@ -24,6 +24,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 def transaccion(data):
+    from app.extensions import db  
     
     try:
         db.session.begin()

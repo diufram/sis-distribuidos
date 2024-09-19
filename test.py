@@ -5,8 +5,9 @@ import random
 from concurrent.futures import ThreadPoolExecutor
 
 # Configura el URL del endpoint de tu servidor Flask
-url = 'http://127.0.0.1:5000/transaccion/transaccion'
+#url = 'http://127.0.0.1:5000/transaccion/transaccion'
 
+url = 'http://127.0.0.1:5000/transaccion-async/transaccion'
 def getAll():
     headers = {'Content-Type': 'application/json'}
     try:

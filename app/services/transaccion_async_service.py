@@ -1,50 +1,102 @@
 import threading
-import queue
 import uuid
 from flask import jsonify, current_app
-
-# Cola de tareas global
-cola_tareas = queue.Queue()
+from app.models import ColaRequest,ColaResponse
+from app.extensions import get_session ,Session # Cambiar 'db' por get_session
+from app.models.cola_request import obtener_primero_en_cola, eliminar_solicitud
+from app.models.cola_response import verificar_transaccion_realizada,add_cola_response
 hilo_iniciado = False
 
+# hilo.py
+
 def hilo(app):
-    with app.app_context():  # Aseguramos que el hilo tiene acceso al contexto de la aplicación
+    with app.app_context():
         while True:
+            session = get_session()
             try:
-                data = cola_tareas.get(timeout=100)  # Obtiene tarea de la cola
-            except queue.Empty:
-                continue  # Si no hay tareas, sigue esperando
+                request = obtener_primero_en_cola(session)
+                if request is None:
+                   
+                    continue
 
-            if data is None:
-                print(f"Salio del Hilo")
-                break  # Salir del hilo si se envía None
+                data = request.datos
+                if data is None:
+                    print("Salió del Hilo")
+                    break
 
-            try:
-                # Hacer la importación aquí para evitar el ciclo
                 from app.services.transaccion_service import transaccion
-                # Procesa la transacción
-                transaccion(data['data'])
-                print(f"Tarea {data['id']} procesada correctamente")
+                try:
+                    transaccion(session, data,request.nro_transaccion)
+                    add_cola_response(session,request.nro_transaccion,data,"Ninguna", True)
+                    eliminar_solicitud(request, session)
+                    session.commit()
+                except Exception as e:
+                    add_cola_response(session,request.nro_transaccion,data,str(e), False)
+                    eliminar_solicitud(request, session)
+                    session.commit()
+                  
             except Exception as e:
-                print(f"Error al procesar la transacción: {e}")
+                session.rollback()
+                
+              
+            finally:
+                session.close()
 
-            cola_tareas.task_done()  # Marca la tarea como completada
+
+def generar_nro_transaccion():
+    # Generar un UUID y tomar solo los caracteres numéricos
+    nro_transaccion = ''.join(filter(str.isdigit, str(uuid.uuid4())))
+    # Limitarlo a una cantidad deseada de dígitos, por ejemplo 8
+    return nro_transaccion[:8]
+
+
 
 def transaccion_asyn(datos):
-    data = {
-        "id": str(uuid.uuid4()),
-        "data": datos,
-        "proceso": "transaccion"
-    }
-    cola_tareas.put(data)  # Agrega la tarea a la cola
+    nro_transaccion = generar_nro_transaccion()
+    session = get_session()
 
-    respuesta = jsonify({"message": "Se está procesando su solicitud", "status": True}), 200
+    try:
+        # Crear la nueva solicitud en la cola
+        request = ColaRequest(nro_transaccion=nro_transaccion, datos=datos)
+        session.add(request)
+        session.commit()
+
+        respuesta = jsonify({
+            "nro_transaccion": nro_transaccion,
+            "message": "Se está procesando su solicitud",
+            "status": True
+        }), 200
+    except Exception as e:
+        session.rollback()  # Revertir en caso de error
+        respuesta = jsonify({
+            "message": f"Error al procesar su solicitud: {e}",
+            "status": False
+        }), 500
+    finally:
+        Session.remove()  # Cerrar la sesión
     return respuesta
+
+def verificacion(nro_transaccion):
+    response =  verificar_transaccion_realizada(nro_transaccion=nro_transaccion)
+  
+    if response is None:
+        return jsonify({
+            "message":"Se esta Procesasando su Transaccion",
+            "status": False}),200
+    elif response.status:
+        return jsonify({
+            "message":"Se realizo correctamente su solicitud",
+            "status": True}),200
+    else:
+        return jsonify({
+            "message":response.error,
+            "status": False}),200
+
+    
 
 def iniciar_hilo():
     global hilo_iniciado
     if not hilo_iniciado:
         print("Iniciando hilo...")
         hilo_iniciado = True
-        # Pasamos la app actual al hilo
         threading.Thread(target=hilo, args=(current_app._get_current_object(),), daemon=True).start()

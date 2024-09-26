@@ -1,9 +1,8 @@
-from app import db
+from app.extensions import db
 from app.models.cuenta_model import Cuenta
 from app.models.user_model import Usuario
 from app.models.transaccion_model import Transaccion
 from flask import jsonify
-from sqlalchemy.exc import IntegrityError,SQLAlchemyError,OperationalError
 
 from sqlalchemy import func
 
@@ -23,108 +22,55 @@ handler.setFormatter(formatter)
 # Agrega el manejador al logger
 logger.addHandler(handler)
 
-def transaccion(data):
-    from app.extensions import db  
-    
-    try:
-        db.session.begin()
-        if not data or not all(k in data for k in ('nroCuenta', 'tipo', 'monto', 'ciUsuario')):
-            logger.warning('Datos incompletos: %s', data)
-            respuesta = jsonify({"message": "Todos los campos son requeridos", "status": False}), 400
-            return respuesta
+def transaccion(session, data,nro_transaccion):
+    if not data or not all(k in data for k in ('nroCuenta', 'tipo', 'monto', 'ciUsuario')):
+        logger.warning('Datos incompletos: %s', data)
+        raise ValueError("Todos los campos son requeridos")
 
-        tipo = data['tipo']
-        nroCuenta = data['nroCuenta']
-        monto = data['monto']
-        ciUsuario = data['ciUsuario']
+    tipo = data['tipo']
+    nroCuenta = data['nroCuenta']
+    monto = data['monto']
+    ciUsuario = data['ciUsuario']
 
-        if tipo == 1:  # retiro
-            if not hayfonndos(nroCuenta=nroCuenta, monto=monto):
-                logger.warning('Fondos insuficientes para cuenta %s con monto %s', nroCuenta, monto)
-                respuesta = jsonify({"message": "Fondos Insuficientes", "status": False}), 400
-                return respuesta
+    if tipo == 1:  # Retiro
+        if not hayfondos(session, nroCuenta=nroCuenta, monto=monto):
+            logger.warning('Fondos insuficientes para cuenta %s con monto %s', nroCuenta, monto)
+            raise ValueError("Fondos Insuficientes")
+        retiro(session, nroCuenta=nroCuenta, monto=monto)
+    elif tipo == 0:  # Depósito
+        deposito(session, nroCuenta=nroCuenta, monto=monto)
+    else:
+        logger.warning('Tipo de transacción no válido: %s', tipo)
+        raise ValueError("Tipo de transacción no válido")
 
-            retiro(nroCuenta=nroCuenta, monto=monto)
-            guardarTransaccion(nroCuenta=nroCuenta, ciUsuario=ciUsuario, monto=monto, tipo=tipo)
-            logger.info('Retiro exitoso: cuenta %s, monto %s', nroCuenta, monto)
-            respuesta = jsonify({"message": "Transaccion exitosa", "status": True}), 200
-            db.session.commit()
-            return respuesta
+    guardarTransaccion(session, nroCuenta=nroCuenta, ciUsuario=ciUsuario, monto=monto, tipo=tipo,nro_transaccion=nro_transaccion)
+    logger.info('Transacción exitosa: cuenta %s, tipo %s, monto %s', nroCuenta, tipo, monto)
 
-        elif tipo == 0:  # deposito
-            deposito(nroCuenta=nroCuenta, monto=monto)
-            guardarTransaccion(nroCuenta=nroCuenta, ciUsuario=ciUsuario, monto=monto, tipo=tipo)
-            logger.info('Deposito exitoso: cuenta %s, monto %s', nroCuenta, monto)
-            respuesta = jsonify({"message": "Transaccion exitosa", "status": True}), 200
-            db.session.commit()
-            return respuesta
+# Las funciones de retiro y depósito no deben hacer commit
+def retiro(session, nroCuenta, monto):
+    cuenta = session.query(Cuenta).filter(Cuenta.id == nroCuenta).first()
+    cuenta.saldo -= monto
 
-        else:
-            logger.warning('Tipo de transacción no válido: %s', tipo)
-            respuesta = jsonify({"message": "Tipo de transacción no válido", "status": False}), 400
-            return respuesta
-
-    except IntegrityError as e:
-        db.session.rollback()
-        logger.error('Error de integridad: %s', str(e))
-        respuesta = jsonify({"message": "El numero de transaccion ya existe", "status": False}), 409
-        return respuesta
-    
-    except OperationalError as e:
-        db.session.rollback()
-        respuesta = jsonify({"message": "Error de base de datos", "status": False}), 410
-        return respuesta
-        
-
-    except ValueError as e:
-        db.session.rollback()
-        logger.error('Error de valor: %s', str(e))
-        respuesta = jsonify({"message": "Error en los valores proporcionados", "status": False}), 400
-        return respuesta
-
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        logger.error('Error con la base de datos: %s', str(e))
-        respuesta = jsonify({"message": "Error con la base de datos", "status": False}), 500
-        return respuesta
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error('Error interno del servidor: %s', str(e))
-        respuesta = jsonify({"message": "Error interno del servidor", "status": False}), 500
-        return respuesta
-    
-    finally:
-        db.session.remove()
-        logger.info('Transacción completada para cuenta %s, tipo %s', nroCuenta, tipo)
+def deposito(session, nroCuenta, monto):
+    cuenta = session.query(Cuenta).filter(Cuenta.id == nroCuenta).first()
+    cuenta.saldo += monto
 
 
+def hayfondos(session, nroCuenta, monto):
+    saldo = session.query(Cuenta.saldo).filter_by(id=nroCuenta).scalar()
+    return saldo >= monto
 
-def hayfonndos(nroCuenta, monto):
-    saldo = db.session.query(Cuenta.saldo).filter_by(id = nroCuenta).scalar()
-    if saldo >= monto:
-        return True
-    return False
 
-def retiro(nroCuenta, monto):
-    cuenta = db.session.query(Cuenta).filter(Cuenta.id == nroCuenta).first()
-    cuenta.saldo = cuenta.saldo - monto
-    db.session.commit()
-
-def deposito(nroCuenta, monto):
-    cuenta = db.session.query(Cuenta).filter(Cuenta.id == nroCuenta).first()
-    cuenta.saldo = cuenta.saldo + monto
-    db.session.commit()
-
-def guardarTransaccion(nroCuenta,ciUsuario,monto,tipo):
-    
+def guardarTransaccion(session, nroCuenta, ciUsuario, monto, tipo,nro_transaccion):
     transaccion = Transaccion(
-            ci_usuario= ciUsuario,
-            id_cuenta= nroCuenta,
-            tipo= tipo,
-            monto=monto
-        )
-    db.session.add(transaccion)
+        nro_transaccion=nro_transaccion,
+        ci_usuario=ciUsuario,
+        id_cuenta=nroCuenta,
+        tipo=tipo,
+        monto=monto
+    )
+    session.add(transaccion)
+
 
 def getAll():
     try:

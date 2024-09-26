@@ -42,7 +42,7 @@ def thread_function(cuentas, saldo_maximo, saldo_minimo, usuarios):
         time.sleep(0.1)  # Opcional: retraso para no sobrecargar el servidor
 
 # Número de hilos
-num_threads = 1000
+num_threads = 500
 
 # Crea y arranca los hilos
 response_data = getAll()
@@ -55,6 +55,6 @@ with ThreadPoolExecutor(max_workers=num_threads) as executor:
     futures = [executor.submit(thread_function, cuentas, saldo_maximo, saldo_minimo, usuarios) for _ in range(num_threads)]
 
     # Espera a que todos los hilos terminen (esto es opcional y depende de cómo quieras manejar el tiempo de ejecución)
-    for future in futures:
-        future.result()  # Puedes manejar excepciones aquí si es necesario
+    #for future in futures:
+     #   future.result()  # Puedes manejar excepciones aquí si es necesario
 

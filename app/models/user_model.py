@@ -1,4 +1,5 @@
-from app import db
+from app.extensions import db
+
 
 # Modelo Usuario
 class Usuario(db.Model):

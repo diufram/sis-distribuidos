@@ -14,9 +14,11 @@ class Config:
     
     # Configuración de SQLAlchemy
     SQLALCHEMY_DATABASE_URI = os.environ.get(
-        'SQLALCHEMY_DATABASE_URI', 
-        'postgresql://matias:0000@localhost:5432/distribuido?options=-c%20default_transaction_isolation=serializable'
-    )
+    'SQLALCHEMY_DATABASE_URI', 
+    'postgresql://matias:0000@localhost:5432/distribuido'
+)
+
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     SQLALCHEMY_ENGINE_OPTIONS = {

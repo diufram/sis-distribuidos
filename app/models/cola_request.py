@@ -10,6 +10,7 @@ class ColaRequest(db.Model):
     status = db.Column(db.Boolean, nullable=False, default=False)
     intentos = db.Column(db.Integer, nullable=False, default=3)
     fecha_procesado = db.Column(db.DateTime, nullable=True)
+    urlCallback = db.Column(db.String, nullable=False)
     fecha_creacion = db.Column(db.DateTime, default=func.now())
 
     def __repr__(self):

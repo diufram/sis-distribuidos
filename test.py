@@ -22,7 +22,8 @@ def make_request(nroCuenta, tipo, monto, ciUsuario):
         "nroCuenta": nroCuenta,
         "tipo": tipo,
         "monto": monto,
-        "ciUsuario": ciUsuario
+        "ciUsuario": ciUsuario,
+        "urlCallback": "responder.aqui.com/"
     }
     headers = {'Content-Type': 'application/json'}
     try:
@@ -42,7 +43,7 @@ def thread_function(cuentas, saldo_maximo, saldo_minimo, usuarios):
         time.sleep(0.1)  # Opcional: retraso para no sobrecargar el servidor
 
 # Número de hilos
-num_threads = 500
+num_threads = 10
 
 # Crea y arranca los hilos
 response_data = getAll()

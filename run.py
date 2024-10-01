@@ -7,5 +7,7 @@ if __name__ == '__main__':
 
     app = create_app()
     with app.app_context():
-        iniciar_hilo()
-    app.run(host= "0.0.0.0", port="5000",debug=True,use_reloader=False)
+        iniciar_hilo(1)
+        iniciar_hilo(1)
+        iniciar_hilo(2)
+    app.run(host= "0.0.0.0", port="5000",debug=True,use_reloader=True)

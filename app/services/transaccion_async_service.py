@@ -66,15 +66,21 @@ def hilo_response(app):
                     if request.datos['tipo']== 1:
                         data = {
                             "nro_transaccion":request.nro_transaccion,
-                            "message": f"Se realizó con éxito el Retiro de {monto}Bs."}
+                            "message": f"Se realizó con éxito el Retiro de {monto}Bs.",
+                            "status": True
+                            }
                     else:
                         data = {
                             "nro_transaccion":request.nro_transaccion,
-                            "message":f"Se realizó con éxito el Deposito de {monto}Bs."}    
+                            "message":f"Se realizó con éxito el Deposito de {monto}Bs.",
+                            "status": True
+                            }    
                 else:
                     data = {
                         "nro_transaccion":request.nro_transaccion,
-                        "message": request.error}
+                        "message": request.error,
+                        "status": False
+                        }
                     
                 headers = {'Content-Type': 'application/json'}
                 try: 
@@ -114,6 +120,7 @@ def transaccion_asyn(datos):
         respuesta = jsonify({
             "nro_transaccion": nro_transaccion,
             "message": "Se está procesando su solicitud",
+            "url": "http://127.0.0.1:5000/transaccion-async/verificacion",
             "status": True
         }), 200
     except Exception as e:
@@ -128,19 +135,32 @@ def transaccion_asyn(datos):
 
 def verificacion(nro_transaccion):
     response =  verificar_transaccion_realizada(nro_transaccion=nro_transaccion)
-  
+    data = {}
+
     if response is None:
         return jsonify({
             "message":"Se esta Procesasando su Transaccion",
             "status": False}),200
     elif response.status:
-        return jsonify({
-            "message":"Se realizo correctamente su solicitud",
-            "status": True}),200
+        monto = response.datos['monto']
+        if response.datos['tipo']== 1:
+            data = {
+                   "nro_transaccion":response.nro_transaccion,
+                   "message": f"Se realizó con éxito el Retiro de {monto}Bs.",
+                   "status": True
+                    }
+        else:
+             data = {
+                    "nro_transaccion":response.nro_transaccion,
+                    "message":f"Se realizó con éxito el Deposito de {monto}Bs.",
+                    "status": True
+                    }    
+        return jsonify(data),200
     else:
         return jsonify({
-            "message":response.error,
-            "status": False}),200
+                        "nro_transaccion":response.nro_transaccion,
+                        "message": f"No se pudo realizar la transaccion {response.error}",
+                        "status": False}),200
 
     
 
@@ -151,5 +171,5 @@ def iniciar_hilo(tipo):
         #hilos_activos.append(nuevo_hilo)
     elif tipo == 2: #TIPO RESPONSE
         print("HILO PARA RESPONDER INICIADO")
-        nuevo_hilo = threading.Thread(target=hilo_response, args=(current_app._get_current_object(),), daemon=True).start()
+        #nuevo_hilo = threading.Thread(target=hilo_response, args=(current_app._get_current_object(),), daemon=True).start()
         #hilos_activos.append(nuevo_hilo)

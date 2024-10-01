@@ -23,7 +23,7 @@ def make_request(nroCuenta, tipo, monto, ciUsuario):
         "tipo": tipo,
         "monto": monto,
         "ciUsuario": ciUsuario,
-        "urlCallback": "responder.aqui.com/"
+        "urlCallback": "http://localhost:3000/notify"
     }
     headers = {'Content-Type': 'application/json'}
     try:
@@ -38,12 +38,13 @@ def thread_function(cuentas, saldo_maximo, saldo_minimo, usuarios):
         cuenta_aleatoria = random.choice(cuentas)
         usuario_aleatorio = random.choice(usuarios)
         monto_aleatorio = random.uniform(saldo_minimo, saldo_maximo)
+        monto_aleatorio = round(monto_aleatorio,2)
         numero_aleatorio = random.choice([0, 1])
         make_request(cuenta_aleatoria, numero_aleatorio, monto_aleatorio, usuario_aleatorio)
         time.sleep(0.1)  # Opcional: retraso para no sobrecargar el servidor
 
 # Número de hilos
-num_threads = 10
+num_threads = 1
 
 # Crea y arranca los hilos
 response_data = getAll()
